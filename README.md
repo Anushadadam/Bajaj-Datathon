@@ -191,7 +191,7 @@ All settings can be configured via environment variables:
 | `GOOGLE_CLOUD_VISION_API_KEY` | Google Cloud Vision API key | Required |
 | `GOOGLE_GEMINI_API_KEY` | Google Gemini API key | Required |
 | `USE_GOOGLE_VISION` | Use Google Vision (vs Tesseract) | `true` |
-| `GEMINI_MODEL` | Gemini model to use | `gemini-1.5-pro` |
+| `GEMINI_MODEL` | Gemini model to use | `gemini-2.5-pro` |
 | `TEMPERATURE` | LLM temperature | `0.1` |
 | `PORT` | API server port | `3000` |
 | `LOG_LEVEL` | Logging level | `INFO` |
@@ -282,14 +282,3 @@ The system prompt explicitly tells the LLM:
 - Single-pass extraction per page
 - Cumulative token tracking across all LLM calls
 
-## 🤝 Contributing
-
-This is a hackathon submission. For questions or issues, please contact the development team.
-
-## 📄 License
-
-This project is created for the HackRx Hackathon.
-
----
-
-**Built with ❤️ for HackRx Hackathon**
