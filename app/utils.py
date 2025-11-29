@@ -145,6 +145,43 @@ def deduplicate_items(all_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return unique_items
 
 
+def extract_total_from_text(text: str) -> float:
+    """
+    Extract total amount from text using regex
+    
+    Args:
+        text: OCR text
+        
+    Returns:
+        Extracted total amount or 0.0
+    """
+    # Patterns for total amount
+    # Look for "Total", "Net Amount", "Grand Total" followed by a number
+    patterns = [
+        r'(?:grand\s+)?total[\s:]+([₹$€£]?\s*[\d,]+\.?\d*)',
+        r'net\s+amount[\s:]+([₹$€£]?\s*[\d,]+\.?\d*)',
+        r'amount\s+payable[\s:]+([₹$€£]?\s*[\d,]+\.?\d*)',
+        r'final\s+amount[\s:]+([₹$€£]?\s*[\d,]+\.?\d*)',
+        r'balance\s+due[\s:]+([₹$€£]?\s*[\d,]+\.?\d*)'
+    ]
+    
+    text_lower = text.lower()
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, text_lower)
+        if matches:
+            # Get the last match as it's usually the final total
+            amount_str = matches[-1]
+            # Clean and parse
+            cleaned = re.sub(r'[₹$€£,\s]', '', amount_str)
+            try:
+                return float(cleaned)
+            except ValueError:
+                continue
+                
+    return 0.0
+
+
 def cleanup_temp_file(file_path: str):
     """Remove temporary file"""
     try:

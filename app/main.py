@@ -19,7 +19,8 @@ from app.utils import (
     download_document,
     is_pdf,
     cleanup_temp_file,
-    deduplicate_items
+    deduplicate_items,
+    extract_total_from_text
 )
 from app.ocr_processor import OCRProcessor
 from app.llm_extractor import LLMExtractor
@@ -110,6 +111,20 @@ async def extract_bill_data(request: BillExtractionRequest):
         try:
             extracted_pages, token_usage = llm_extractor.extract_from_document(page_texts)
             logger.info(f"Extracted data from {len(extracted_pages)} pages")
+            
+            # Fallback: Try to extract total using regex if LLM missed it
+            for i, page_data in enumerate(extracted_pages):
+                if page_data.get('detected_total_amount', 0) == 0:
+                    # Find corresponding OCR text
+                    page_num = int(page_data['page_no'])
+                    # Find text for this page
+                    page_text = next((text for p, text in page_texts if p == page_num), "")
+                    if page_text:
+                        regex_total = extract_total_from_text(page_text)
+                        if regex_total > 0:
+                            logger.info(f"LLM missed total for page {page_num}, found {regex_total} via regex")
+                            page_data['detected_total_amount'] = regex_total
+                            
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -129,11 +144,28 @@ async def extract_bill_data(request: BillExtractionRequest):
             pagewise_item = PagewiseLineItems(
                 page_no=page_data['page_no'],
                 page_type=page_data['page_type'],
-                bill_items=bill_items
+                bill_items=bill_items,
+                detected_total_amount=page_data.get('detected_total_amount', 0.0),
+                detected_subtotal=page_data.get('detected_subtotal', 0.0)
             )
             
             pagewise_line_items.append(pagewise_item)
             total_item_count += len(bill_items)
+            
+        # Verification: Check if extracted items sum matches detected total
+        calculated_total = sum(item.item_amount for page in pagewise_line_items for item in page.bill_items)
+        detected_total = sum(page.detected_total_amount for page in pagewise_line_items)
+        
+        if detected_total > 0:
+            diff = abs(calculated_total - detected_total)
+            if diff > 1.0:  # Allow small floating point difference
+                logger.warning(
+                    f"Total mismatch! Calculated: {calculated_total}, Detected: {detected_total}, Diff: {diff}"
+                )
+            else:
+                logger.info(f"Total verification passed. Calculated: {calculated_total}, Detected: {detected_total}")
+        else:
+            logger.info(f"No document total detected for verification. Calculated total: {calculated_total}")
         
         # Create response
         response = BillExtractionResponse(

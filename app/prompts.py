@@ -42,6 +42,8 @@ CRITICAL RULES:
 OUTPUT FORMAT:
 Return a JSON object with this exact structure:
 {
+  "page_total": float, // REQUIRED: The total amount shown on the page (e.g. "Total", "Grand Total", "Net Amount"). Use 0.0 if not found.
+  "page_subtotal": float, // REQUIRED: The subtotal amount shown on the page. Use 0.0 if not found.
   "page_no": "1",
   "page_type": "Bill Detail" | "Final Bill" | "Pharmacy",
   "bill_items": [
@@ -53,6 +55,10 @@ Return a JSON object with this exact structure:
     }
   ]
 }
+
+IMPORTANT:
+- ALWAYS extract "page_total" if a total amount is visible. This is critical for verification.
+- Do NOT include these summary rows in "bill_items". "bill_items" should ONLY contain individual line items.
 
 EXAMPLES OF WHAT TO EXTRACT:
 ✓ "Paracetamol 500mg" with amount "150.00"
@@ -94,7 +100,7 @@ VALIDATION_PROMPT = """Review the extracted bill data and verify:
 
 1. All item_amount, item_rate, and item_quantity are valid positive numbers
 2. No metadata fields (dates, IDs, phone numbers) are included as line items
-3. No subtotal/total rows are included as line items
+3. No subtotal/total rows are included as line items (they should be in page_total/page_subtotal)
 4. Page type is correctly classified
 
 If you find any issues, correct them and return the cleaned JSON.

@@ -4,6 +4,7 @@ import logging
 import re
 from typing import List, Dict, Any, Tuple
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 from app.config import settings
 from app.prompts import SYSTEM_PROMPT, get_extraction_prompt
@@ -24,13 +25,22 @@ class LLMExtractor:
         # Configure Gemini
         genai.configure(api_key=settings.google_gemini_api_key)
         
+        # Safety settings to avoid blocking medical content
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
+        
         # Initialize model
         self.model = genai.GenerativeModel(
             model_name=settings.gemini_model,
             generation_config={
                 "temperature": settings.temperature,
                 "max_output_tokens": settings.max_tokens,
-            }
+            },
+            safety_settings=safety_settings
         )
         
         # Token tracking
@@ -66,6 +76,7 @@ class LLMExtractor:
             
             # Parse response
             response_text = response.text.strip()
+            logger.debug(f"Raw LLM Response for page {page_number}: {response_text}")
             
             # Extract JSON from response (handle markdown code blocks)
             json_text = self._extract_json(response_text)
@@ -80,11 +91,16 @@ class LLMExtractor:
             
         except Exception as e:
             logger.error(f"LLM extraction failed for page {page_number}: {e}")
+            if "finish_reason" in str(e) and "2" in str(e):
+                logger.warning(f"Page {page_number} blocked by safety filters. Returning empty data.")
+            
             # Return empty structure on error
             return {
                 "page_no": str(page_number),
                 "page_type": "Bill Detail",
-                "bill_items": []
+                "bill_items": [],
+                "detected_total_amount": 0.0,
+                "detected_subtotal": 0.0
             }
     
     def _extract_json(self, text: str) -> str:
@@ -140,6 +156,10 @@ class LLMExtractor:
                 cleaned_items.append(cleaned_item)
         
         data['bill_items'] = cleaned_items
+        
+        # Extract totals
+        data['detected_total_amount'] = self._parse_number(data.get('page_total', 0))
+        data['detected_subtotal'] = self._parse_number(data.get('page_subtotal', 0))
         
         return data
     

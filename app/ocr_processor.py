@@ -142,14 +142,30 @@ class OCRProcessor:
             raise Exception("pdf2image is not installed. Cannot process PDF files.")
         
         try:
-            # Convert PDF pages to images
-            images = convert_from_path(pdf_path, dpi=300)
+            # Get page count first
+            from pdf2image import pdfinfo_from_path
+            info = pdfinfo_from_path(pdf_path)
+            max_pages = info["Pages"]
             
             results = []
-            for page_num, image in enumerate(images, start=1):
+            # Process pages one by one to save memory
+            for page_num in range(1, max_pages + 1):
+                # Convert single page
+                # Reduce DPI to 200 to save memory (300 is often overkill for OCR)
+                images = convert_from_path(pdf_path, first_page=page_num, last_page=page_num, dpi=200)
+                
+                if not images:
+                    continue
+                    
+                image = images[0]
+                
                 # Save image temporarily
                 temp_image_path = f"/tmp/page_{page_num}.png"
                 image.save(temp_image_path, 'PNG')
+                
+                # Free memory
+                del image
+                del images
                 
                 # Extract text from image
                 text = self.extract_text_from_image(temp_image_path)

@@ -23,6 +23,8 @@ class PagewiseLineItems(BaseModel):
         ..., description="Type of page"
     )
     bill_items: List[BillItem] = Field(..., description="List of bill items on this page")
+    detected_total_amount: float = Field(default=0.0, description="Total amount detected on the page (for verification)")
+    detected_subtotal: float = Field(default=0.0, description="Subtotal detected on the page (for verification)")
 
 
 class TokenUsage(BaseModel):
